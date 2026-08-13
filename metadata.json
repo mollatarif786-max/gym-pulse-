@@ -1,0 +1,6 @@
+{
+  "name": "GymPulse - Gym & Nutrition Tracker",
+  "description": "A comprehensive gym workout logging, step tracking, Mifflin-St Jeor calorie maintenance, protein targeting, and nutrition companion app.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
