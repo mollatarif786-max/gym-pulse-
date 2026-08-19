@@ -22,18 +22,18 @@ const STORAGE_KEYS = {
 
 export const DEFAULT_USER_PROFILE: UserProfile = {
   id: 'user_default',
-  name: 'Alex Miller',
-  age: 26,
+  name: 'Athlete',
+  age: 25,
   gender: 'male',
-  heightCm: 178,
-  weightKg: 78.5,
+  heightCm: 175,
+  weightKg: 70.0,
   activityLevel: 'moderately_active',
   fitnessGoal: 'gain_muscle',
   dietaryPreference: 'non_vegetarian',
   includeEggsIfVegetarian: true,
   dailyStepGoal: 10000,
   unitSystem: 'metric',
-  onboardingCompleted: true,
+  onboardingCompleted: false,
   createdAt: '2026-07-01T08:00:00.000Z',
   updatedAt: '2026-08-13T14:00:00.000Z',
 };

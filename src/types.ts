@@ -1,7 +1,7 @@
 export type Gender = 'male' | 'female' | 'other';
 export type ActivityLevel = 'sedentary' | 'lightly_active' | 'moderately_active' | 'very_active' | 'extra_active';
 export type FitnessGoal = 'maintain' | 'lose_fat' | 'gain_muscle' | 'recomposition';
-export type DietaryPreference = 'vegetarian' | 'non_vegetarian';
+export type DietaryPreference = 'vegetarian' | 'non_vegetarian' | 'eggitarian' | 'vegan';
 export type UnitSystem = 'metric' | 'imperial';
 
 export interface UserProfile {

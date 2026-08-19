@@ -30,6 +30,7 @@ interface NutritionViewProps {
   todayNutrition: DailyNutritionLog;
   onUpdateNutrition: (updatedLog: DailyNutritionLog) => void;
   onAddCustomFood?: (food: FoodItem) => void;
+  onOpenCalculator?: () => void;
 }
 
 export const NutritionView: React.FC<NutritionViewProps> = ({
@@ -38,6 +39,7 @@ export const NutritionView: React.FC<NutritionViewProps> = ({
   todayNutrition,
   onUpdateNutrition,
   onAddCustomFood,
+  onOpenCalculator,
 }) => {
   const [selectedMealType, setSelectedMealType] = useState<'breakfast' | 'lunch' | 'dinner' | 'snacks'>('breakfast');
   const [isAddFoodModalOpen, setIsAddFoodModalOpen] = useState<boolean>(false);
@@ -137,16 +139,28 @@ export const NutritionView: React.FC<NutritionViewProps> = ({
     <div id="nutrition_main_view" className="space-y-6 pb-24">
       {/* Header Macro Overview Card */}
       <div className="bg-[#121212] border border-[#262626] rounded-3xl p-5 md:p-6 shadow-sm space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-[#262626]">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#262626]">
           <div>
             <h1 className="text-xl md:text-2xl font-black text-[#EDEDED] tracking-tight">Today's Nutrition Breakdown</h1>
             <p className="text-xs text-[#A1A1AA]">
-              Mifflin-St Jeor Target: <span className="font-semibold text-orange-400">{targets.targetCalories} kcal</span> (Maintenance: {targets.maintenanceCalories} kcal)
+              Mifflin-St Jeor Target: <span className="font-semibold text-orange-400">{targets.targetCalories} kcal</span> (Maintenance: {targets.maintenanceCalories} kcal) • Protein: <span className="font-semibold text-orange-400">{targets.proteinTargetGrams}g</span>
             </p>
           </div>
-          <span className="text-xs font-mono px-3 py-1 rounded-full bg-[#171717] text-[#EDEDED] border border-[#262626] w-fit">
-            {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
-          </span>
+          <div className="flex items-center gap-2">
+            {onOpenCalculator && (
+              <button
+                type="button"
+                onClick={onOpenCalculator}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-orange-500/10 hover:bg-orange-500 text-orange-400 hover:text-black border border-orange-500/30 transition-all cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                Recalculate Macros
+              </button>
+            )}
+            <span className="text-xs font-mono px-3 py-1 rounded-full bg-[#171717] text-[#EDEDED] border border-[#262626] w-fit">
+              {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+            </span>
+          </div>
         </div>
 
         {/* Macro Progress Cards */}

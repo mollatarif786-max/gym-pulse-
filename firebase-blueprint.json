@@ -1,0 +1,117 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile containing biometrics, macro targets, and preferences",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "maxLength": 150 },
+        "photoURL": { "type": "string" },
+        "age": { "type": "number" },
+        "gender": { "type": "string" },
+        "heightCm": { "type": "number" },
+        "weightKg": { "type": "number" },
+        "activityLevel": { "type": "string" },
+        "fitnessGoal": { "type": "string" },
+        "dietaryPreference": { "type": "string" },
+        "includeEggsIfVegetarian": { "type": "boolean" },
+        "dailyStepGoal": { "type": "number" },
+        "unitSystem": { "type": "string" },
+        "onboardingCompleted": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "name", "weightKg", "heightCm", "fitnessGoal"]
+    },
+    "WorkoutLog": {
+      "title": "WorkoutLog",
+      "description": "Log of completed workouts with sets, volume, and exercises",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "date": { "type": "string", "maxLength": 20 },
+        "routineName": { "type": "string", "maxLength": 100 },
+        "durationMinutes": { "type": "number" },
+        "totalVolumeKg": { "type": "number" },
+        "totalSets": { "type": "number" },
+        "exercises": { "type": "array" },
+        "notes": { "type": "string", "maxLength": 1000 },
+        "rating": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "date", "routineName"]
+    },
+    "DailyNutritionLog": {
+      "title": "DailyNutritionLog",
+      "description": "Daily food, meals and macronutrient intake log",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "date": { "type": "string", "maxLength": 20 },
+        "breakfast": { "type": "array" },
+        "lunch": { "type": "array" },
+        "dinner": { "type": "array" },
+        "snacks": { "type": "array" },
+        "waterMl": { "type": "number" },
+        "notes": { "type": "string", "maxLength": 1000 }
+      },
+      "required": ["userId", "date"]
+    },
+    "BodyMeasurement": {
+      "title": "BodyMeasurement",
+      "description": "Logged body weight and physique measurements over time",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "date": { "type": "string", "maxLength": 20 },
+        "weightKg": { "type": "number" },
+        "waistCm": { "type": "number" },
+        "bodyFatPercentage": { "type": "number" },
+        "notes": { "type": "string", "maxLength": 500 }
+      },
+      "required": ["userId", "date", "weightKg"]
+    },
+    "DailyStepLog": {
+      "title": "DailyStepLog",
+      "description": "Logged steps count per day",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "date": { "type": "string", "maxLength": 20 },
+        "steps": { "type": "number" },
+        "source": { "type": "string" },
+        "syncedAt": { "type": "string" }
+      },
+      "required": ["userId", "date", "steps"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User profile and settings"
+    },
+    "/users/{userId}/workouts/{workoutId}": {
+      "schema": { "$ref": "#/entities/WorkoutLog" },
+      "description": "User workout logs"
+    },
+    "/users/{userId}/nutrition/{dateId}": {
+      "schema": { "$ref": "#/entities/DailyNutritionLog" },
+      "description": "User daily nutrition logs"
+    },
+    "/users/{userId}/measurements/{measurementId}": {
+      "schema": { "$ref": "#/entities/BodyMeasurement" },
+      "description": "User body measurement history"
+    },
+    "/users/{userId}/steps/{dateId}": {
+      "schema": { "$ref": "#/entities/DailyStepLog" },
+      "description": "User daily step logs"
+    }
+  }
+}

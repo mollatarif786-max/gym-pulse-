@@ -11,12 +11,16 @@ import {
 import { StorageService, DEFAULT_USER_PROFILE } from './services/storageService';
 import { calculateNutritionTargets } from './services/calculationEngine';
 import { generateSmartInsights } from './services/insightsEngine';
+import { FirestoreSyncService } from './services/firestoreSyncService';
+import { auth, testConnection } from './firebase';
+import { onAuthStateChanged, User } from 'firebase/auth';
 import { Navbar, NavTab } from './components/Navbar';
 import { DashboardView } from './components/DashboardView';
 import { WorkoutView } from './components/WorkoutView';
 import { NutritionView } from './components/NutritionView';
 import { ProgressView } from './components/ProgressView';
 import { ProfileView } from './components/ProfileView';
+import { LoginPage } from './components/LoginPage';
 import { OnboardingModal } from './components/OnboardingModal';
 import { ActiveWorkoutModal } from './components/ActiveWorkoutModal';
 import { StepSyncModal } from './components/StepSyncModal';
@@ -25,6 +29,10 @@ import { RestTimerFloating } from './components/RestTimerFloating';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
+
+  // Firebase Auth State
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
 
   // Core app state
   const [profile, setProfile] = useState<UserProfile>(DEFAULT_USER_PROFILE);
@@ -48,6 +56,8 @@ export default function App() {
 
   // Load state on mount
   useEffect(() => {
+    testConnection();
+
     const loadedProfile = StorageService.getProfile();
     setProfile(loadedProfile);
     if (!loadedProfile.onboardingCompleted) {
@@ -59,6 +69,73 @@ export default function App() {
     setNutritionLogs(StorageService.getNutritionLogs());
     setStepLogs(StorageService.getStepLogs());
     setMeasurements(StorageService.getMeasurements());
+  }, []);
+
+  // Firebase Auth State Listener & Cloud Sync Engine
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setCurrentUser(user);
+      if (user) {
+        try {
+          // Load user cloud data
+          const cloudData = await FirestoreSyncService.loadAllUserData(user.uid);
+          if (cloudData && cloudData.profile) {
+            setProfile(cloudData.profile);
+            StorageService.saveProfile(cloudData.profile);
+
+            if (cloudData.workouts.length > 0) {
+              setWorkouts(cloudData.workouts);
+              StorageService.saveWorkouts(cloudData.workouts);
+            }
+            if (Object.keys(cloudData.nutritionLogs).length > 0) {
+              const nutList = Object.values(cloudData.nutritionLogs);
+              setNutritionLogs(nutList);
+              StorageService.saveNutritionLogs(nutList);
+            }
+            if (cloudData.measurements.length > 0) {
+              setMeasurements(cloudData.measurements);
+              StorageService.saveMeasurements(cloudData.measurements);
+            }
+            if (cloudData.steps.length > 0) {
+              setStepLogs(cloudData.steps);
+              StorageService.saveStepLogs(cloudData.steps);
+            }
+          } else {
+            // First time signing in with Google: push local profile & data to cloud
+            const localProfile = StorageService.getProfile();
+            const updatedProfile: UserProfile = {
+              ...localProfile,
+              id: user.uid,
+              name: user.displayName || localProfile.name || 'Google Lifter',
+            };
+            setProfile(updatedProfile);
+            StorageService.saveProfile(updatedProfile);
+
+            const localWorkouts = StorageService.getWorkouts();
+            const localNutLogs = StorageService.getNutritionLogs();
+            const nutMap: Record<string, DailyNutritionLog> = {};
+            localNutLogs.forEach((n) => {
+              if (n.date) nutMap[n.date] = n;
+            });
+            const localMeasurements = StorageService.getMeasurements();
+            const localSteps = StorageService.getStepLogs();
+
+            await FirestoreSyncService.syncLocalDataToCloud(
+              user.uid,
+              updatedProfile,
+              localWorkouts,
+              nutMap,
+              localMeasurements,
+              localSteps
+            );
+          }
+        } catch (err) {
+          console.warn('Error syncing cloud state on auth change:', err);
+        }
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
   // Live calculated targets & insights
@@ -123,17 +200,30 @@ export default function App() {
     setIsRestTimerRunning(true);
   };
 
-  // State mutation handlers with persistence
+  // State mutation handlers with local persistence & Firestore sync
   const handleUpdateProfile = (newProfile: UserProfile) => {
     setProfile(newProfile);
     StorageService.saveProfile(newProfile);
     setIsOnboardingOpen(false);
+
+    if (currentUser) {
+      FirestoreSyncService.saveUserProfile(currentUser.uid, newProfile).catch((e) =>
+        console.error('Failed to sync profile update to cloud:', e)
+      );
+    }
   };
 
   const handleSaveWorkout = (newWorkout: WorkoutLog) => {
     StorageService.addWorkoutLog(newWorkout);
-    setWorkouts(StorageService.getWorkouts());
+    const updatedWorkouts = StorageService.getWorkouts();
+    setWorkouts(updatedWorkouts);
     setActiveRoutineForWorkout(undefined);
+
+    if (currentUser) {
+      FirestoreSyncService.saveWorkout(currentUser.uid, newWorkout).catch((e) =>
+        console.error('Failed to sync workout to cloud:', e)
+      );
+    }
   };
 
   const handleDeleteWorkout = (workoutId: string) => {
@@ -154,6 +244,12 @@ export default function App() {
   const handleUpdateNutrition = (updatedLog: DailyNutritionLog) => {
     StorageService.updateDayNutrition(updatedLog);
     setNutritionLogs(StorageService.getNutritionLogs());
+
+    if (currentUser) {
+      FirestoreSyncService.saveNutrition(currentUser.uid, updatedLog).catch((e) =>
+        console.error('Failed to sync nutrition to cloud:', e)
+      );
+    }
   };
 
   const handleQuickLogFood = (mealType: 'breakfast' | 'lunch' | 'dinner' | 'snacks', item: FoodItem) => {
@@ -176,17 +272,43 @@ export default function App() {
     };
     StorageService.updateDayNutrition(updated);
     setNutritionLogs(StorageService.getNutritionLogs());
+
+    if (currentUser) {
+      FirestoreSyncService.saveNutrition(currentUser.uid, updated).catch((e) =>
+        console.error('Failed to sync nutrition to cloud:', e)
+      );
+    }
   };
 
   const handleSaveSteps = (steps: number, source: DailyStepLog['source']) => {
     StorageService.logTodaySteps(steps, source);
-    setStepLogs(StorageService.getStepLogs());
+    const updatedSteps = StorageService.getStepLogs();
+    setStepLogs(updatedSteps);
+
+    if (currentUser) {
+      const todayStep = updatedSteps.find((s) => s.date === todayStr);
+      if (todayStep) {
+        FirestoreSyncService.saveSteps(currentUser.uid, todayStep).catch((e) =>
+          console.error('Failed to sync steps to cloud:', e)
+        );
+      }
+    }
   };
 
   const handleSaveMeasurement = (measurement: BodyMeasurement) => {
     StorageService.addMeasurement(measurement);
     setMeasurements(StorageService.getMeasurements());
-    setProfile(StorageService.getProfile());
+    const updatedProfile = StorageService.getProfile();
+    setProfile(updatedProfile);
+
+    if (currentUser) {
+      FirestoreSyncService.saveMeasurement(currentUser.uid, measurement).catch((e) =>
+        console.error('Failed to sync measurement to cloud:', e)
+      );
+      FirestoreSyncService.saveUserProfile(currentUser.uid, updatedProfile).catch((e) =>
+        console.error('Failed to sync updated weight to cloud profile:', e)
+      );
+    }
   };
 
   const handleResetAll = () => {
@@ -206,6 +328,8 @@ export default function App() {
         activeTab={activeTab}
         onSelectTab={setActiveTab}
         hasActiveWorkout={activeRoutineForWorkout !== undefined}
+        currentUser={currentUser}
+        onOpenLogin={() => setIsLoginModalOpen(true)}
       />
 
       {/* Main View Container */}
@@ -223,8 +347,11 @@ export default function App() {
             onStartWorkout={() => setActiveRoutineForWorkout(null)}
             onOpenStepSync={() => setIsStepModalOpen(true)}
             onOpenLogWeight={() => setIsMeasurementModalOpen(true)}
+            onOpenCalculator={() => setIsOnboardingOpen(true)}
             onQuickLogFood={handleQuickLogFood}
             onNavigateTab={(tab) => setActiveTab(tab as NavTab)}
+            currentUser={currentUser}
+            onOpenLogin={() => setIsLoginModalOpen(true)}
           />
         )}
 
@@ -246,6 +373,7 @@ export default function App() {
             todayNutrition={todayNutrition}
             onUpdateNutrition={handleUpdateNutrition}
             onAddCustomFood={(food) => StorageService.addCustomFood(food)}
+            onOpenCalculator={() => setIsOnboardingOpen(true)}
           />
         )}
 
@@ -267,9 +395,21 @@ export default function App() {
             targets={targets}
             onUpdateProfile={handleUpdateProfile}
             onResetData={handleResetAll}
+            onOpenCalculator={() => setIsOnboardingOpen(true)}
+            currentUser={currentUser}
+            onOpenLogin={() => setIsLoginModalOpen(true)}
           />
         )}
       </main>
+
+      {/* DEDICATED GOOGLE LOGIN / ACCOUNT MODAL */}
+      <LoginPage
+        isOpen={isLoginModalOpen}
+        currentUser={currentUser}
+        onClose={() => setIsLoginModalOpen(false)}
+        onContinueAsGuest={() => setIsLoginModalOpen(false)}
+        onSuccess={() => setIsLoginModalOpen(false)}
+      />
 
       {/* FLOATING REST TIMER */}
       {restTimerVisible && (
@@ -295,11 +435,15 @@ export default function App() {
         />
       )}
 
-      {/* ONBOARDING MODAL */}
+      {/* ONBOARDING & CALORIE / PROTEIN CALCULATOR MODAL */}
       <OnboardingModal
         initialProfile={profile}
         isOpen={isOnboardingOpen}
-        onComplete={handleUpdateProfile}
+        onComplete={(updated) => {
+          handleUpdateProfile(updated);
+          setIsOnboardingOpen(false);
+        }}
+        onClose={() => setIsOnboardingOpen(false)}
       />
 
       {/* STEP SYNC MODAL */}
